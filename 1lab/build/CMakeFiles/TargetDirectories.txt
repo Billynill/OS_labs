@@ -1,0 +1,4 @@
+/Users/rustam/Desktop/Учеба/OS/1lab/build/CMakeFiles/parent.dir
+/Users/rustam/Desktop/Учеба/OS/1lab/build/CMakeFiles/child.dir
+/Users/rustam/Desktop/Учеба/OS/1lab/build/CMakeFiles/edit_cache.dir
+/Users/rustam/Desktop/Учеба/OS/1lab/build/CMakeFiles/rebuild_cache.dir
