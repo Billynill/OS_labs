@@ -1,9 +1,11 @@
 #define _POSIX_C_SOURCE 200809L
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <errno.h>
 #include <unistd.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
 
 static int SumFloatsInLine(const char *line, float *outSum, int *outCount) {
     if (!line || !outSum || !outCount) return -1;
@@ -35,23 +37,36 @@ static int SumFloatsInLine(const char *line, float *outSum, int *outCount) {
 
 int main(int argc, char *argv[]) {
     if (argc < 2) {
-        fprintf(stderr, "Использование: %s <output_file>\n", argv[0]);
+        char usageMsg[100];
+        snprintf(usageMsg, sizeof(usageMsg), "Использование: %s <output_file>\n", argv[0]);
+        write(STDERR_FILENO, usageMsg, strlen(usageMsg));
         return 1;
     }
 
     const char *outPath = argv[1];
-    FILE *fout = fopen(outPath, "a");
-    if (!fout) {
-        perror("fopen output");
+    int fout = open(outPath, O_WRONLY | O_CREAT | O_APPEND, 0644);
+    if (fout == -1) {
+        char errorMsg[] = "fopen output: ";
+        write(STDERR_FILENO, errorMsg, sizeof(errorMsg) - 1);
+        perror("");
         return 1;
     }
 
     char line[1024];
-    while (fgets(line, sizeof(line), stdin)) {
-        if (ferror(stdin)) {
-            perror("fgets stdin");
+    char resultMsg[512];
+    char errorMsg[100];
+
+    while (1) {
+        ssize_t bytesRead = read(STDIN_FILENO, line, sizeof(line) - 1);
+        if (bytesRead <= 0) {
+            if (bytesRead < 0) {
+                char readError[] = "fgets stdin: ";
+                write(STDERR_FILENO, readError, sizeof(readError) - 1);
+                perror("");
+            }
             break;
         }
+        line[bytesRead] = '\0';
 
         size_t l = strlen(line);
         if (l > 0 && line[l-1] == '\n') line[l-1] = '\0';
@@ -60,25 +75,29 @@ int main(int argc, char *argv[]) {
         int count = 0;
 
         if (SumFloatsInLine(line, &sum, &count) != 0) {
-            fprintf(stderr, "error: parse line\n");
+            char parseError[] = "error: parse line\n";
+            write(STDERR_FILENO, parseError, sizeof(parseError) - 1);
             continue;
         }
 
         if (count == 0) {
-            printf("no numbers\n");
-            fflush(stdout);
+            char noNumbers[] = "no numbers\n";
+            write(STDOUT_FILENO, noNumbers, sizeof(noNumbers) - 1);
             continue;
         }
 
-        if (fprintf(fout, "line: \"%s\" sum: %.6f count: %d\n", line, sum, count) < 0) {
-            fprintf(stderr, "error: write to file\n");
+        char fileLine[1024];
+        snprintf(fileLine, sizeof(fileLine), "line: \"%s\" sum: %.6f count: %d\n", line, sum, count);
+        ssize_t written = write(fout, fileLine, strlen(fileLine));
+        if (written <= 0) {
+            char writeError[] = "error: write to file\n";
+            write(STDERR_FILENO, writeError, sizeof(writeError) - 1);
         }
-        fflush(fout);
 
-        printf("sum=%.6f count=%d\n", sum, count);
-        fflush(stdout);
+        snprintf(resultMsg, sizeof(resultMsg), "sum=%.6f count=%d\n", sum, count);
+        write(STDOUT_FILENO, resultMsg, strlen(resultMsg));
     }
 
-    fclose(fout);
+    close(fout);
     return 0;
 }

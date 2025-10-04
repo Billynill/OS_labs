@@ -1,5 +1,4 @@
 #define _POSIX_C_SOURCE 200809L
-#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
@@ -7,16 +6,22 @@
 #include <signal.h>
 #include <sys/types.h>
 #include <sys/wait.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
 
 int main() {
     char fileName[256];
-    printf("Введите имя файла для результатов (например, results.txt): ");
-    fflush(stdout);
+    char prompt[] = "Введите имя файла для результатов (например, results.txt): ";
+    write(STDOUT_FILENO, prompt, sizeof(prompt) - 1);
 
-    if (!fgets(fileName, sizeof(fileName), stdin)) {
-        fprintf(stderr, "Ошибка: не удалось прочитать имя файла\n");
+    ssize_t bytesRead = read(STDIN_FILENO, fileName, sizeof(fileName) - 1);
+    if (bytesRead <= 0) {
+        char errorMsg[] = "Ошибка: не удалось прочитать имя файла\n";
+        write(STDERR_FILENO, errorMsg, sizeof(errorMsg) - 1);
         return 1;
     }
+    fileName[bytesRead] = '\0';
 
     size_t len = strlen(fileName);
     if (len > 0 && fileName[len - 1] == '\n') {
@@ -24,7 +29,8 @@ int main() {
     }
 
     if (strlen(fileName) == 0) {
-        fprintf(stderr, "Ошибка: имя файла пустое\n");
+        char errorMsg[] = "Ошибка: имя файла пустое\n";
+        write(STDERR_FILENO, errorMsg, sizeof(errorMsg) - 1);
         return 1;
     }
 
@@ -32,12 +38,16 @@ int main() {
     int pipe2[2];
 
     if (pipe(pipe1) == -1) {
-        perror("pipe1");
+        char errorMsg[] = "pipe1: ";
+        write(STDERR_FILENO, errorMsg, sizeof(errorMsg) - 1);
+        perror("");
         return 1;
     }
 
     if (pipe(pipe2) == -1) {
-        perror("pipe2");
+        char errorMsg[] = "pipe2: ";
+        write(STDERR_FILENO, errorMsg, sizeof(errorMsg) - 1);
+        perror("");
         close(pipe1[0]);
         close(pipe1[1]);
         return 1;
@@ -45,9 +55,13 @@ int main() {
 
     pid_t pid = fork();
     if (pid < 0) {
-        perror("fork");
-        close(pipe1[0]); close(pipe1[1]);
-        close(pipe2[0]); close(pipe2[1]);
+        char errorMsg[] = "fork: ";
+        write(STDERR_FILENO, errorMsg, sizeof(errorMsg) - 1);
+        perror("");
+        close(pipe1[0]);
+        close(pipe1[1]);
+        close(pipe2[0]);
+        close(pipe2[1]);
         return 1;
     }
 
@@ -75,73 +89,66 @@ int main() {
     close(pipe1[0]);
     close(pipe2[1]);
 
-    FILE *toChild = fdopen(pipe1[1], "w");
-    if (!toChild) {
-        perror("fdopen toChild");
-        close(pipe1[1]);
-        close(pipe2[0]);
-        kill(pid, SIGTERM);
-        waitpid(pid, NULL, 0);
-        return 1;
-    }
-
-    FILE *fromChild = fdopen(pipe2[0], "r");
-    if (!fromChild) {
-        perror("fdopen fromChild");
-        fclose(toChild);
-        close(pipe2[0]);
-        kill(pid, SIGTERM);
-        waitpid(pid, NULL, 0);
-        return 1;
-    }
-
-    printf("Теперь вводите строки с числами (float через точку), например: 1.5 2 3\n");
-    printf("Для завершения введите: exit\n");
+    char infoMsg1[] = "Теперь вводите строки с числами (float через точку), например: 1.5 2 3\n";
+    char infoMsg2[] = "Для завершения введите: exit\n";
+    write(STDOUT_FILENO, infoMsg1, sizeof(infoMsg1) - 1);
+    write(STDOUT_FILENO, infoMsg2, sizeof(infoMsg2) - 1);
 
     char line[1024];
-    while (1) {
-        printf("> ");
-        fflush(stdout);
+    char childReply[512];
 
-        if (!fgets(line, sizeof(line), stdin)) {
-            if (feof(stdin)) {
-                printf("\nКонец ввода\n");
+    while (1) {
+        char promptSymbol[] = "> ";
+        write(STDOUT_FILENO, promptSymbol, sizeof(promptSymbol) - 1);
+
+        bytesRead = read(STDIN_FILENO, line, sizeof(line) - 1);
+        if (bytesRead <= 0) {
+            if (bytesRead == 0) {
+                char eofMsg[] = "\nКонец ввода\n";
+                write(STDOUT_FILENO, eofMsg, sizeof(eofMsg) - 1);
             } else {
-                perror("fgets stdin");
+                perror("read stdin");
             }
             break;
         }
+        line[bytesRead] = '\0';
 
         size_t l = strlen(line);
-        if (l > 0 && line[l - 1] == '\n') line[l - 1] = '\0';
+        if (l > 0 && line[l - 1] == '\n') {
+            line[l - 1] = '\0';
+        }
 
         if (strcmp(line, "exit") == 0) {
             break;
         }
 
-        if (fprintf(toChild, "%s\n", line) < 0) {
-            perror("fprintf toChild");
+        char lineWithNewline[1024];
+        snprintf(lineWithNewline, sizeof(lineWithNewline), "%s\n", line);
+        ssize_t written = write(pipe1[1], lineWithNewline, strlen(lineWithNewline));
+        if (written <= 0) {
+            perror("write to child");
             break;
         }
-        fflush(toChild);
 
-        char reply[512];
-        if (fgets(reply, sizeof(reply), fromChild)) {
-            size_t rl = strlen(reply);
-            if (rl > 0 && reply[rl - 1] == '\n') reply[rl - 1] = '\0';
-            printf("[child] %s\n", reply);
+        bytesRead = read(pipe2[0], childReply, sizeof(childReply) - 1);
+        if (bytesRead > 0) {
+            childReply[bytesRead] = '\0';
+            char prefix[] = "[child] ";
+            write(STDOUT_FILENO, prefix, sizeof(prefix) - 1);
+            write(STDOUT_FILENO, childReply, bytesRead);
         } else {
-            if (feof(fromChild)) {
-                printf("Дочерний процесс закрыл канал\n");
+            if (bytesRead == 0) {
+                char closedMsg[] = "Дочерний процесс закрыл канал\n";
+                write(STDOUT_FILENO, closedMsg, sizeof(closedMsg) - 1);
             } else {
-                perror("fgets fromChild");
+                perror("read from child");
             }
             break;
         }
     }
 
-    fclose(toChild);
-    fclose(fromChild);
+    close(pipe1[1]);
+    close(pipe2[0]);
 
     int status = 0;
     if (waitpid(pid, &status, 0) == -1) {
@@ -151,15 +158,17 @@ int main() {
 
     if (WIFEXITED(status)) {
         int code = WEXITSTATUS(status);
+        char doneMsg[100];
         if (code == 0) {
-            printf("Готово. Дочерний процесс завершился успешно.\n");
+            snprintf(doneMsg, sizeof(doneMsg), "Готово. Дочерний процесс завершился успешно.\n");
         } else {
-            printf("Дочерний процесс завершился с кодом %d.\n", code);
+            snprintf(doneMsg, sizeof(doneMsg), "Дочерний процесс завершился с кодом %d.\n", code);
         }
+        write(STDOUT_FILENO, doneMsg, strlen(doneMsg));
     } else if (WIFSIGNALED(status)) {
-        printf("Дочерний процесс завершён сигналом %d.\n", WTERMSIG(status));
-    } else if (WIFSTOPPED(status)) {
-        printf("Дочерний процесс остановлен сигналом %d.\n", WSTOPSIG(status));
+        char signalMsg[100];
+        snprintf(signalMsg, sizeof(signalMsg), "Дочерний процесс завершён сигналом %d.\n", WTERMSIG(status));
+        write(STDOUT_FILENO, signalMsg, strlen(signalMsg));
     }
 
     return 0;
