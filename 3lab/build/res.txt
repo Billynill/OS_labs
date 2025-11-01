@@ -1,0 +1,4 @@
+line: "1 2 4 5" sum: 12.00 count: 4
+line: "2 3 45" sum: 50.00 count: 3
+line: "1 2 3 4" sum: 10.00 count: 4
+line: "3 4 0 0" sum: 7.00 count: 4

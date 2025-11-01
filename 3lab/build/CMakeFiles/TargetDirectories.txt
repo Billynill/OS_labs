@@ -1,0 +1,4 @@
+/Users/rustam/Desktop/Учеба/OS/3lab/build/CMakeFiles/server.dir
+/Users/rustam/Desktop/Учеба/OS/3lab/build/CMakeFiles/client.dir
+/Users/rustam/Desktop/Учеба/OS/3lab/build/CMakeFiles/edit_cache.dir
+/Users/rustam/Desktop/Учеба/OS/3lab/build/CMakeFiles/rebuild_cache.dir
