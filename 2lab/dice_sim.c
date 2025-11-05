@@ -8,7 +8,6 @@
 #define STDOUT_FILENO 1
 #define STDERR_FILENO 2
 
-// --- Вспомогательные функции вывода ---
 void write_str(int fd, const char* s) {
     write(fd, s, strlen(s));
 }

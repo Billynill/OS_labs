@@ -1,0 +1,3 @@
+line: "13 2 34 3.3" sum: 52.30 count: 4
+line: "12 34 56 65" sum: 167.00 count: 4
+line: "12 34 56 89" sum: 191.00 count: 4
