@@ -1,0 +1,6 @@
+/Users/rustam/Desktop/Учеба/OS/4lab/build/CMakeFiles/method1.dir
+/Users/rustam/Desktop/Учеба/OS/4lab/build/CMakeFiles/method2.dir
+/Users/rustam/Desktop/Учеба/OS/4lab/build/CMakeFiles/program1.dir
+/Users/rustam/Desktop/Учеба/OS/4lab/build/CMakeFiles/program2.dir
+/Users/rustam/Desktop/Учеба/OS/4lab/build/CMakeFiles/edit_cache.dir
+/Users/rustam/Desktop/Учеба/OS/4lab/build/CMakeFiles/rebuild_cache.dir
